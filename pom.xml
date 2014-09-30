@@ -6,8 +6,8 @@
   <artifactId>idp-memcached-storage</artifactId>
   <version>1.0-SNAPSHOT</version>
   <packaging>jar</packaging>
-
   <name>Memcached storage service for Shibboleth IdPv3</name>
+  <url>https://github.com/serac/idp-memcached-storage/</url>
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
