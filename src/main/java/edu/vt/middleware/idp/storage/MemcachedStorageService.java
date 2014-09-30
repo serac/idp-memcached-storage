@@ -1,3 +1,7 @@
+/*
+ * See LICENSE for licensing and NOTICE for copyright.
+ */
+
 package edu.vt.middleware.idp.storage;
 
 import java.io.IOException;

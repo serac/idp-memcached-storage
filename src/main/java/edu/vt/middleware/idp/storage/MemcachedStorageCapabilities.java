@@ -1,3 +1,7 @@
+/*
+ * See LICENSE for licensing and NOTICE for copyright.
+ */
+
 package edu.vt.middleware.idp.storage;
 
 import net.shibboleth.utilities.java.support.annotation.constraint.Positive;
