@@ -2,6 +2,12 @@
   xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
+  <parent>
+    <groupId>net.shibboleth.idp</groupId>
+    <artifactId>idp-parent</artifactId>
+    <version>3.0-SNAPSHOT</version>
+  </parent>
+
   <groupId>edu.vt.middleware</groupId>
   <artifactId>idp-memcached-storage</artifactId>
   <version>1.0-SNAPSHOT</version>
@@ -11,8 +17,6 @@
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <opensaml.version>3.0-SNAPSHOT</opensaml.version>
-    <java-support.version>5.0-SNAPSHOT</java-support.version>
   </properties>
 
   <dependencies>
@@ -27,46 +31,37 @@
       <version>${opensaml.version}</version>
     </dependency>
     <dependency>
-      <groupId>net.shibboleth.utilities</groupId>
-      <artifactId>java-support</artifactId>
-      <version>${java-support.version}</version>
-    </dependency>
-    <dependency>
       <groupId>org.cryptacular</groupId>
       <artifactId>cryptacular</artifactId>
-      <version>1.0-RC5</version>
-    </dependency>
-    <dependency>
-      <groupId>com.google.code.findbugs</groupId>
-      <artifactId>jsr305</artifactId>
-      <version>3.0.0</version>
-    </dependency>
-    <dependency>
-      <groupId>org.slf4j</groupId>
-      <artifactId>slf4j-api</artifactId>
-      <version>1.7.7</version>
-    </dependency>
-    <dependency>
-      <groupId>org.testng</groupId>
-      <artifactId>testng</artifactId>
-      <version>6.8.8</version>
-      <scope>test</scope>
     </dependency>
   </dependencies>
 
   <build>
     <plugins>
       <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-compiler-plugin</artifactId>
-        <configuration>
-          <showDeprecation>true</showDeprecation>
-          <showWarnings>true</showWarnings>
-          <debug>true</debug>
-          <source>1.7</source>
-          <target>1.7</target>
-        </configuration>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-surefire-plugin</artifactId>
+          <version>2.17</version>
+          <configuration>
+            <excludedGroups>${excluded.test.groups}</excludedGroups>
+          </configuration>
       </plugin>
     </plugins>
   </build>
+
+  <profiles>
+    <profile>
+      <id>default</id>
+      <activation><activeByDefault>true</activeByDefault></activation>
+      <properties>
+        <excluded.test.groups>needs-external-fixture</excluded.test.groups>
+      </properties>
+    </profile>
+    <profile>
+      <id>all</id>
+      <properties>
+        <excluded.test.groups/>
+      </properties>
+    </profile>
+  </profiles>
 </project>

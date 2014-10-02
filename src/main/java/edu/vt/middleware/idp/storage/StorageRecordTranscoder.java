@@ -28,9 +28,9 @@ public class StorageRecordTranscoder implements Transcoder<MemcachedStorageRecor
 
     @Override
     public CachedData encode(final MemcachedStorageRecord o) {
-        final byte[] value= o.getValue().getBytes(StandardCharsets.UTF_8);
+        final byte[] value = o.getValue().getBytes(StandardCharsets.UTF_8);
         final byte[] encoded = new byte[value.length + 8];
-        ByteUtil.toBytes(o.getExpiration() == null ? 0 : o.getExpiration().longValue(), encoded, 4);
+        ByteUtil.toBytes(o.getExpiration() == null ? 0 : o.getExpiration().longValue(), encoded, 0);
         System.arraycopy(value, 0, encoded, 8, value.length);
         return new CachedData(0, encoded, MAX_SIZE);
     }

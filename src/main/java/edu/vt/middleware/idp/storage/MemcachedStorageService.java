@@ -39,14 +39,16 @@ import org.slf4j.LoggerFactory;
  * Memcached storage service. The implementation of context names is based on the implementation of
  * <em>simulated namespaces</em> discussed on the Memcached project site:
  * <p>
- * <a href="https://code.google.com/p/memcached/wiki/NewProgrammingTricks#Namespacing">https://code.google.com/p/memcached/wiki/NewProgrammingTricks#Namespacing</a>
+ * <a href="https://code.google.com/p/memcached/wiki/NewProgrammingTricks#Namespacing">
+ *     https://code.google.com/p/memcached/wiki/NewProgrammingTricks#Namespacing</a>
  * <p>
- * This storage service supports arbitrary-length context names and keys despite the limitation of 250-byte length
- * limit on memcached keys. Keys whose length is greater than 250 bytes are hashed using the SHA-512 algorithm and
- * hex encoded to produce a 128-character key that is stored in memcached. Collisions are avoided irrespective of
- * hashing by using the memcached add operation on all create operations which guarantees that an entry is created
- * if and only if a key of the same value does not already exist. Note that context names and keys are assumed to be
- * in the ASCII character set such that key lengths are equal to their size in bytes.
+ * This storage service supports arbitrary-length context names and keys despite the 250-byte limit on memcached keys.
+ * Keys whose length is greater than 250 bytes are hashed using the SHA-512 algorithm and hex encoded to produce a
+ * 128-character key that is stored in memcached. Collisions are avoided irrespective of hashing by using the memcached
+ * add operation on all create operations which guarantees that an entry is created if and only if a key of the
+ * same value does not already exist. Note that context names and keys are assumed to have single-byte encodings in
+ * UTF-8 (i.e. ASCII characters) such that key lengths are equal to their size in bytes. Hashed keys naturally meet
+ * this requirement.
  *
  * @author Marvin S. Addison
  */
@@ -79,7 +81,10 @@ public class MemcachedStorageService extends AbstractIdentifiedInitializableComp
     /**
      * Creates a new instance.
      *
-     * @param client Memcached client object.
+     * @param client Memcached client object. The client MUST be configured to use the binary memcached protocol,
+     *               i.e. {@link net.spy.memcached.BinaryConnectionFactory}, in order for
+     *               {@link #deleteWithVersion(long, String, String)} and {@link #deleteWithVersion(long, Object)}
+     *               to work correctly. The binary protocol is recommended for efficiency as well.
      * @param timeout Memcached operation timeout in seconds.
      */
     public MemcachedStorageService(@Nonnull final MemcachedClient client, @Positive int timeout) {
@@ -179,19 +184,20 @@ public class MemcachedStorageService extends AbstractIdentifiedInitializableComp
     }
 
     @Override
-    public Pair<Long , StorageRecord> read(@Nonnull @NotEmpty final String context,
+    public Pair<Long, StorageRecord> read(@Nonnull @NotEmpty final String context,
                                            @Nonnull @NotEmpty final String key,
                                            @Positive final long version) throws IOException {
         Constraint.isGreaterThan(0, version, "Version must be positive");
         final StorageRecord record = read(context, key);
-        if (record != null) {
-            if (version == record.getVersion()) {
-                return new Pair<>(version, record);
-            } else {
-                return new Pair<>(version, null);
-            }
+        if (record == null) {
+            return new Pair<>();
         }
-        return new Pair<>(null, null);
+        final Pair<Long, StorageRecord> result = new Pair<>(record.getVersion(), null);
+        if (version != record.getVersion()) {
+            // Only set the record if it's not the same as the version requested
+            result.setSecond(record);
+        }
+        return result;
     }
 
     @Override
@@ -256,8 +262,8 @@ public class MemcachedStorageService extends AbstractIdentifiedInitializableComp
         final String cacheKey = memcachedKey(namespace, key);
         final MemcachedStorageRecord record = new MemcachedStorageRecord(value, expiration);
         this.logger.debug("Updating entry at {} for context={}, key={}, version={}", cacheKey, context, key, version);
-        final CASResponse response = handleAsyncResult(
-                this.client.asyncCAS(cacheKey, version, record.getMemcachedExpiration(), record, storageRecordTranscoder));
+        final CASResponse response = handleAsyncResult(this.client.asyncCAS(
+                cacheKey, version, record.getMemcachedExpiration(), record, storageRecordTranscoder));
         Long newVersion = null;
         if (CASResponse.OK == response) {
             final CASValue<MemcachedStorageRecord> newRecord = this.client.gets(cacheKey, storageRecordTranscoder);
@@ -324,9 +330,9 @@ public class MemcachedStorageService extends AbstractIdentifiedInitializableComp
     }
 
     @Override
-    public boolean delete(
-            @Nonnull @NotEmpty final String context,
-            @Nonnull @NotEmpty final String key) throws IOException {
+    public boolean delete(@Nonnull @NotEmpty final String context, @Nonnull @NotEmpty final String key)
+            throws IOException {
+
         Constraint.isNotNull(StringSupport.trimOrNull(context), "Context cannot be null or empty");
         Constraint.isNotNull(StringSupport.trimOrNull(key), "Key cannot be null or empty");
         final String namespace = lookupNamespace(context);
@@ -408,7 +414,8 @@ public class MemcachedStorageService extends AbstractIdentifiedInitializableComp
 
     private String lookupNamespace(final String context) throws IOException {
         try {
-            return this.client.gets(memcachedKey(context), stringTranscoder).getValue();
+            final CASValue<String> result = this.client.gets(memcachedKey(context), stringTranscoder);
+            return result == null ? null : result.getValue();
         } catch (RuntimeException e) {
             throw new IOException("Memcached operation failed", e);
         }
