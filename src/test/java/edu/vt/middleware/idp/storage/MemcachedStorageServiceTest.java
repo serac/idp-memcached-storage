@@ -44,7 +44,7 @@ public class MemcachedStorageServiceTest {
         try {
             client.asyncGet("does_not_exist").get(500, TimeUnit.MILLISECONDS);
         } catch (Exception e) {
-            fail("Memcached operation failure", e);
+            fail("Memcached operation failure. Is memcached running on localhost:11211?", e);
         }
         service = new MemcachedStorageService(client, 1);
     }
