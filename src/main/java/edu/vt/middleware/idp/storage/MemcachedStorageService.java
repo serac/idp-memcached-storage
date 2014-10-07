@@ -237,7 +237,7 @@ public class MemcachedStorageService extends AbstractIdentifiedInitializableComp
         this.logger.debug("Reading entry at {} for context={}, key={}", cacheKey, context, key);
         final CASValue<MemcachedStorageRecord> record;
         try {
-            record = this.client.gets(cacheKey, storageRecordTranscoder);
+            record = handleAsyncResult(this.client.asyncGets(cacheKey, storageRecordTranscoder));
         } catch (RuntimeException e) {
             throw new IOException("Memcached operation failed", e);
         }
@@ -339,7 +339,8 @@ public class MemcachedStorageService extends AbstractIdentifiedInitializableComp
                 this.client.asyncCAS(cacheKey, version, expiry, record, storageRecordTranscoder));
         Long newVersion = null;
         if (CASResponse.OK == response) {
-            final CASValue<MemcachedStorageRecord> newRecord = this.client.gets(cacheKey, storageRecordTranscoder);
+            final CASValue<MemcachedStorageRecord> newRecord = handleAsyncResult(
+                    this.client.asyncGets(cacheKey, storageRecordTranscoder));
             if (newRecord != null) {
                 newVersion = newRecord.getCas();
             }
@@ -487,13 +488,15 @@ public class MemcachedStorageService extends AbstractIdentifiedInitializableComp
             logger.debug("Cannot update context expiration since context namespace does not exist");
             return;
         }
-        final CASValue<String> keys = this.client.gets(namespace + CTX_KEY_LIST_SUFFIX, stringTranscoder);
+        final CASValue<String> keys = handleAsyncResult(
+                this.client.asyncGets(namespace + CTX_KEY_LIST_SUFFIX, stringTranscoder));
         if (keys == null) {
             logger.debug("No context keys found to update expiration");
             return;
         }
         final Set<String> keySet = new HashSet<>(Arrays.asList(keys.getValue().split(CTX_KEY_LIST_DELIMITER)));
-        final CASValue<String> blacklistKeys = this.client.gets(namespace + CTX_KEY_BLACKLIST_SUFFIX, stringTranscoder);
+        final CASValue<String> blacklistKeys = handleAsyncResult(
+                this.client.asyncGets(namespace + CTX_KEY_BLACKLIST_SUFFIX, stringTranscoder));
         if (blacklistKeys != null) {
             keySet.removeAll(Arrays.asList(blacklistKeys.getValue().split(CTX_KEY_LIST_DELIMITER)));
         }
@@ -544,7 +547,8 @@ public class MemcachedStorageService extends AbstractIdentifiedInitializableComp
      */
     protected String lookupNamespace(final String context) throws IOException {
         try {
-            final CASValue<String> result = this.client.gets(memcachedKey(context), stringTranscoder);
+            final CASValue<String> result = handleAsyncResult(
+                    this.client.asyncGets(memcachedKey(context), stringTranscoder));
             return result == null ? null : result.getValue();
         } catch (RuntimeException e) {
             throw new IOException("Memcached operation failed", e);
