@@ -17,13 +17,13 @@ public class MemcachedStorageRecordTest {
     public void testNumericExpiration() {
         final MemcachedStorageRecord record = new MemcachedStorageRecord("r1", 5031757792L);
         assertEquals(record.getExpiration().longValue(), 5031757792L);
-        assertEquals(record.getMemcachedExpiration(), 5031757);
+        assertEquals(record.getExpiry(), 5031757);
     }
 
     @Test
     public void testNullExpiration() {
         final MemcachedStorageRecord record = new MemcachedStorageRecord("r2", null);
         assertNull(record.getExpiration());
-        assertEquals(record.getMemcachedExpiration(), 0);
+        assertEquals(record.getExpiry(), 0);
     }
 }

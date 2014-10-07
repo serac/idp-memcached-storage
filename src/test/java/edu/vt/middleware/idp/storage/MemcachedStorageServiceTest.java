@@ -6,6 +6,7 @@ package edu.vt.middleware.idp.storage;
 
 import net.shibboleth.utilities.java.support.collection.Pair;
 import net.spy.memcached.BinaryConnectionFactory;
+import net.spy.memcached.DefaultConnectionFactory;
 import net.spy.memcached.MemcachedClient;
 import org.cryptacular.generator.IdGenerator;
 import org.cryptacular.generator.RandomIdGenerator;
@@ -19,9 +20,12 @@ import org.testng.annotations.Test;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
 
 /**
  * Unit test for {@link MemcachedStorageService} class.
@@ -36,6 +40,8 @@ public class MemcachedStorageServiceTest {
 
     private MemcachedStorageService service;
 
+    private MemcachedStorageService keyTrackingService;
+
     @BeforeClass
     public void setUp() throws IOException {
         final MemcachedClient client = new MemcachedClient(
@@ -47,6 +53,7 @@ public class MemcachedStorageServiceTest {
             fail("Memcached operation failure. Is memcached running on localhost:11211?", e);
         }
         service = new MemcachedStorageService(client, 1);
+        keyTrackingService = new MemcachedStorageService(client, 1, true);
     }
 
     @DataProvider
@@ -91,11 +98,11 @@ public class MemcachedStorageServiceTest {
             final String context, final String key, final String value, final String updatedValue)
             throws IOException {
         assertNull(service.read(context, key));
-        assertTrue(service.create(context, key, value, 1000L));
+        assertTrue(service.create(context, key, value, 5000L));
         final StorageRecord r1 = service.read(context, key);
         assertNotNull(r1);
         assertEquals(r1.getValue(), value);
-        assertTrue(service.update(context, key, updatedValue, 1000L));
+        assertTrue(service.update(context, key, updatedValue, 5000L));
         final StorageRecord r2 = service.read(context, key);
         assertNotNull(r2);
         assertEquals(r2.getValue(), updatedValue);
@@ -109,11 +116,11 @@ public class MemcachedStorageServiceTest {
             final String context, final String key, final String value, final String updatedValue)
             throws IOException, VersionMismatchException {
         assertNull(service.read(context, key));
-        assertTrue(service.create(context, key, value, 1000L));
+        assertTrue(service.create(context, key, value, 5000L));
         final StorageRecord r1 = service.read(context, key);
         assertNotNull(r1);
         assertEquals(r1.getValue(), value);
-        final Long updatedVersion = service.updateWithVersion(r1.getVersion(), context, key, updatedValue, 1000L);
+        final Long updatedVersion = service.updateWithVersion(r1.getVersion(), context, key, updatedValue, 5000L);
         assertTrue((updatedVersion > r1.getVersion()));
         final Pair<Long, StorageRecord> pair1 = service.read(context, key, r1.getVersion());
         assertEquals(pair1.getFirst(), updatedVersion);
@@ -151,8 +158,75 @@ public class MemcachedStorageServiceTest {
         assertNull(service.read(context, key3));
     }
 
+
+    @Test
+    public void testUpdateExpiration() throws IOException {
+        final IdGenerator generator = new RandomIdGenerator(20);
+        final String context = generator.generate();
+        final String key = "expiration_test_key";
+        final String value = "Oh well, oh well, oh well, oh well";
+        assertTrue(service.create(context, key, value, 30000L));
+        final StorageRecord record = service.read(context, key);
+        assertNotNull(record);
+        assertEquals(record.getValue(), value);
+        assertTrue(service.updateExpiration(context, key, System.currentTimeMillis() - 5000));
+        assertNull(service.read(context, key));
+    }
+
+    @Test
+    public void testUpdateContextExpiration() throws Exception {
+        final IdGenerator generator = new RandomIdGenerator(20);
+        final String context = generator.generate();
+        final Set<String> keySet = createContextKeys(context, generator, 20);
+        // Set expiration of all context keys to time in the past
+        // Should cause all entries to be expired
+        keyTrackingService.updateContextExpiration(context, System.currentTimeMillis() - 5000);
+        for (String k : keySet) {
+            assertNull(keyTrackingService.read(context, k));
+        }
+    }
+
+    @Test
+    public void testUpdateContextExpirationWithBlacklisting() throws Exception {
+        final IdGenerator generator = new RandomIdGenerator(20);
+        final String context = generator.generate();
+        final Set<String> keysTBD = createContextKeys(context, generator, 20);
+        for (String key : keysTBD) {
+            assertTrue(keyTrackingService.delete(context, key));
+        }
+        final Set<String> newKeys = createContextKeys(context, generator, 20);
+        // Set expiration of all context keys to time in the past
+        // Should cause all entries to be expired
+        keyTrackingService.updateContextExpiration(context, System.currentTimeMillis() - 5000);
+        final Set<String> allKeys = new HashSet<>(keysTBD);
+        allKeys.addAll(newKeys);
+        for (String k : allKeys) {
+            assertNull(keyTrackingService.read(context, k));
+        }
+    }
+
     @AfterClass
     public void tearDown() {
         service.destroy();
+    }
+
+    private Set<String> createContextKeys(final String context, final IdGenerator generator, final int count)
+            throws IOException {
+        final String valueBase = "Context value ";
+        final Set<String> keySet = new HashSet<>();
+        String key;
+        boolean result;
+        for (int i = 0; i < count; i++) {
+            key = generator.generate();
+            result = keyTrackingService.create(context, key, valueBase + i, 30000L);
+            if (result) {
+                keySet.add(key);
+            }
+        }
+        assertEquals(keySet.size(), count);
+        for (String k : keySet) {
+            assertNotNull(keyTrackingService.read(context, k));
+        }
+        return keySet;
     }
 }

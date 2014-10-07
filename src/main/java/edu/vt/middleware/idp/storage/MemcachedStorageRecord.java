@@ -29,12 +29,22 @@ public class MemcachedStorageRecord extends StorageRecord {
     }
 
     /**
+     * Converts a {@link StorageRecord#getExpiration()} value in milliseconds to the corresponding value in seconds.
+     *
+     * @return 0 if given expiration is null, otherwise <code>exp/1000</code>.
+     */
+    public static int expiry(final Long exp) {
+        return exp == null ? 0 : (int) (exp / 1000);
+    }
+
+    /**
      * Gets the expiration date as an integer representing seconds since the Unix epoch, 1970-01-01T00:00:00.
+     * The value provided by this method is suitable for representing the memcached entry expiration.
      *
      * @return 0 if expiration is null, otherwise <code>getExpiration()/1000</code>.
      */
-    public int getMemcachedExpiration() {
-        return getExpiration() == null ? 0 : (int) (getExpiration() / 1000);
+    public int getExpiry() {
+        return expiry(getExpiration());
     }
 
     /**
