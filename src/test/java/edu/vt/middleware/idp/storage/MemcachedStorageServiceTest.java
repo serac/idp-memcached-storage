@@ -208,6 +208,7 @@ public class MemcachedStorageServiceTest {
     @AfterClass
     public void tearDown() {
         service.destroy();
+        keyTrackingService.destroy();
     }
 
     private Set<String> createContextKeys(final String context, final IdGenerator generator, final int count)
